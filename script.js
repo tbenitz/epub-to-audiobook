@@ -157,7 +157,15 @@ if (fileInput) {
   });
 }
 
-// Drag & drop (no createReader anywhere!)
+// Global drag-over/drop prevention so the browser doesn't just open the file
+document.addEventListener("dragover", (e) => {
+  e.preventDefault();
+});
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+});
+
+// Drag & drop for our zone
 const dropZone = document.getElementById("dropZone");
 if (dropZone) {
   dropZone.addEventListener("click", () => {
