@@ -1,141 +1,62 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>EPUB → Audiobook</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #111827;
-      color: #e5e7eb;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      min-height: 100vh;
-      align-items: center;
-      justify-content: center;
-    }
-    .app {
-      width: 100%;
-      max-width: 700px;
-      padding: 24px;
-      box-sizing: border-box;
-      background: #020617;
-      border-radius: 12px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-    }
-    h1 {
-      margin-top: 0;
-      font-size: 1.5rem;
-    }
-    #dropZone {
-      border: 2px dashed #4b5563;
-      border-radius: 8px;
-      padding: 28px;
-      text-align: center;
-      margin-bottom: 16px;
-      cursor: pointer;
-      transition: border-color 0.15s ease, background-color 0.15s ease;
-    }
-    #dropZone.dragging {
-      border-color: #60a5fa;
-      background-color: rgba(37,99,235,0.15);
-    }
-    #dropZone span {
-      display: block;
-      margin-bottom: 8px;
-    }
-    #epubInput {
-      display: none;
-    }
-    #status {
-      font-size: 0.9rem;
-      color: #9ca3af;
-      margin-bottom: 10px;
-      min-height: 1.2em;
-    }
-    #title {
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-    #bookControls.hidden {
-      display: none;
-    }
-    .row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-    select, button, input[type="range"] {
-      font: inherit;
-    }
-    button {
-      background: #2563eb;
-      color: #f9fafb;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #1d4ed8;
-    }
-    button.secondary {
-      background: #374151;
-    }
-    button.secondary:hover {
-      background: #4b5563;
-    }
-    progress {
-      width: 100%;
-      height: 8px;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-  </style>
-</head>
-<body>
-  <div class="app">
-    <h1>EPUB → Audiobook (TTS)</h1>
+// Wait until the page is fully loaded
+document.addEventListener("DOMContentLoaded", () => {
+  const fileInput = document.getElementById("epubInput");
+  const dropZone = document.getElementById("dropZone");
 
-    <div id="dropZone">
-      <span><strong>Drop an EPUB here</strong> or click to choose a file</span>
-      <small>.epub files only, stays in your browser</small>
-      <input type="file" id="epubInput" accept=".epub" />
-    </div>
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) handleEpubFile(file);
+    });
+  }
 
-    <div id="status">Idle</div>
-    <div id="title">No book loaded</div>
+  if (dropZone) {
+    dropZone.addEventListener("click", () => fileInput?.click());
 
-    <div id="bookControls" class="hidden">
-      <div class="row">
-        <label for="chapterSelect">Chapter:</label>
-        <select id="chapterSelect"></select>
-      </div>
+    ["dragover", "dragenter"].forEach(ev => {
+      dropZone.addEventListener(ev, e => {
+        e.preventDefault();
+        dropZone.classList.add("dragging");
+      });
+    });
 
-      <div class="row">
-        <button id="playPause">Play</button>
-        <button id="stop" class="secondary">Stop</button>
+    ["dragleave", "dragend", "drop"].forEach(ev => {
+      dropZone.addEventListener(ev, e => {
+        e.preventDefault();
+        dropZone.classList.remove("dragging");
+      });
+    });
 
-        <label for="rate">Rate:</label>
-        <input id="rate" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
-        <span id="rateValue">1.0×</span>
-      </div>
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      const file = Array.from(e.dataTransfer.files).find(f =>
+        f.name.toLowerCase().endsWith(".epub")
+      );
+      if (file) handleEpubFile(file);
+      else setStatus("Please drop an .epub file");
+    });
+  }
 
-      <progress id="progress" max="100" value="0"></progress>
-    </div>
-  </div>
+  // Rest of your event listeners (chapterSelect, playPause, etc.)
+  document.getElementById("chapterSelect")?.addEventListener("change", e => {
+    if (e.target.value) loadChapter(e.target.value);
+  });
 
-  <!-- JSZip (required by EPUB.js) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  document.getElementById("playPause")?.addEventListener("click", () => {
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+    } else if (speechSynthesis.speaking) {
+      speechSynthesis.pause();
+    }
+    // (or use the improved version from my previous answer)
+  });
 
-  <!-- EPUB.js (global ePub function) -->
-  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+  document.getElementById("stop")?.addEventListener("click", stop);
 
-  <!-- Your main script -->
-  <script src="script.js"></script>
-</body>
-</html>
+  // rate display
+  const rateInput = document.getElementById("rate");
+  const rateValue = document.getElementById("rateValue");
+  rateInput?.addEventListener("input", () => {
+    rateValue.textContent = (parseFloat(rateInput.value) || 1).toFixed(1) + "×";
+  });
+});
