@@ -35,5 +35,9 @@
   </div>
 
   <script type="module" src="script.js"></script>
+  <script type="module">
+  import { createReader } from 'https://cdn.jsdelivr.net/npm/epubjs@0.3.89/+esm';
+  window.createReader = createReader;  // Make it globally available
+</script>
 </body>
 </html>
