@@ -1,44 +1,141 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EPUB → Audiobook</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8" />
+  <title>EPUB to Audiobook</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+    }
+    .app {
+      width: 100%;
+      max-width: 700px;
+      padding: 24px;
+      box-sizing: border-box;
+      background: #020617;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+    #dropZone {
+      border: 2px dashed #4b5563;
+      border-radius: 8px;
+      padding: 28px;
+      text-align: center;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    #dropZone.dragging {
+      border-color: #60a5fa;
+      background-color: rgba(37,99,235,0.15);
+    }
+    #dropZone span {
+      display: block;
+      margin-bottom: 8px;
+    }
+    #epubInput {
+      display: none;
+    }
+    #status {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      margin-bottom: 10px;
+      min-height: 1.2em;
+    }
+    #title {
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    #bookControls.hidden {
+      display: none;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    select, button, input[type="range"] {
+      font: inherit;
+    }
+    button {
+      background: #2563eb;
+      color: #f9fafb;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    button.secondary {
+      background: #374151;
+    }
+    button.secondary:hover {
+      background: #4b5563;
+    }
+    progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <h1>EPUB → Audiobook</h1>
-    <p>Upload an EPUB and listen to it — 100% in-browser, private, lightning-fast.</p>
+  <div class="app">
+    <h1>EPUB to Audiobook (TTS)</h1>
 
-    <input type="file" id="epubInput" accept=".epub" />
-    <div id="status">Drop an EPUB to start</div>
-
-    <div id="bookControls" class="hidden">
-      <h2 id="title"></h2>
-      <select id="chapterSelect"></select>
-      <div class="controls">
-        <button id="playPause">Play</button>
-        <button id="stop">Stop</button>
-        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1"/>
-        <span id="rateValue">1.0×</span>
-      </div>
-      <progress id="progress" value="0" max="100"></progress>
+    <div id="dropZone">
+      <span><strong>Drop an EPUB here</strong> or click to choose a file</span>
+      <small>.epub files only</small>
+      <input type="file" id="epubInput" accept=".epub" />
     </div>
 
-    <details id="about">
-      <summary>About this site</summary>
-      <p>Uses <a href="https://github.com/futurepress/epub.js" target="_blank">EPUB.js</a> + browser built-in TTS (or Supertonic when fully integrated).</p>
-      <p>No data leaves your device.</p>
-    </details>
+    <div id="status">Idle</div>
+    <div id="title">No book loaded</div>
+
+    <div id="bookControls" class="hidden">
+      <div class="row">
+        <label for="chapterSelect">Chapter:</label>
+        <select id="chapterSelect"></select>
+      </div>
+
+      <div class="row">
+        <button id="playPause">Play</button>
+        <button id="stop" class="secondary">Stop</button>
+
+        <label for="rate">Rate:</label>
+        <input id="rate" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
+        <span id="rateValue">1.0×</span>
+      </div>
+
+      <progress id="progress" max="100" value="0"></progress>
+    </div>
   </div>
 
-  <!-- Load EPUB.js and expose the constructor globally -->
-  <script type="module">
-    import ePub from 'https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js';
-    window.ePub = ePub;
-  </script>
+  <!-- JSZip (required by EPUB.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-  <script type="module" src="script.js"></script>
+  <!-- EPUB.js (global ePub function) -->
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+
+  <!-- Your main script -->
+  <script src="script.js"></script>
 </body>
 </html>
