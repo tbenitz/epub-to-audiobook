@@ -1,62 +1,59 @@
-// Wait until the page is fully loaded
-document.addEventListener("DOMContentLoaded", () => {
-  const fileInput = document.getElementById("epubInput");
-  const dropZone = document.getElementById("dropZone");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>EPUB → Audiobook</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; background:#111827; color:#e5e7eb; margin:0; padding:20px; display:flex; justify-content:center; }
+    .app { background:#020617; padding:30px; border-radius:12px; max-width:700px; width:100%; box-shadow:0 20px 40px rgba(0,0,0,.6); }
+    h1 { margin-top:0; }
+    #dropZone { border:3px dashed #4b5563; padding:50px; text-align:center; border-radius:12px; cursor:pointer; margin-bottom:20px; }
+    #dropZone.dragging { border-color:#60a5fa; background:rgba(96,165,250,.2); }
+    #epubInput { display:none; }
+    #status { min-height:1.4em; color:#9ca3af; margin:10px 0; }
+    #bookControls.hidden { display:none; }
+    .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:15px 0; }
+    button, select, input[type=range] { padding:8px 14px; border-radius:6px; font-size:1rem; }
+    button { background:#2563eb; color:white; border:none; cursor:pointer; }
+    button:hover { background:#1d4ed8; }
+    button.secondary { background:#374151; }
+    progress { width:100%; height:10px; border-radius:10px; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>EPUB → Audiobook (TTS)</h1>
 
-  if (fileInput) {
-    fileInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) handleEpubFile(file);
-    });
-  }
+    <div id="dropZone">
+      <strong>Drop your .epub here<br>or <strong>click to choose</strong>
+      <input type="file" id="epubInput" accept=".epub,application/epub+zip">
+    </div>
 
-  if (dropZone) {
-    dropZone.addEventListener("click", () => fileInput?.click());
+    <div id="status">Ready – drop or select an EPUB file</div>
+    <div id="title"><em>No book loaded</em></div>
 
-    ["dragover", "dragenter"].forEach(ev => {
-      dropZone.addEventListener(ev, e => {
-        e.preventDefault();
-        dropZone.classList.add("dragging");
-      });
-    });
+    <div id="bookControls" class="hidden">
+      <div class="row">
+        <label>Chapter:</label>
+        <select id="chapterSelect"></select>
+      </div>
+      <div class="row">
+        <button id="playPause">Play</button>
+        <button id="stop" class="secondary">Stop</button>
+        <label>Speed:</label>
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+        <span id="rateValue">1.0×</span>
+      </div>
+      <progress id="progress" value="0" max="100"></progress>
+    </div>
+  </div>
 
-    ["dragleave", "dragend", "drop"].forEach(ev => {
-      dropZone.addEventListener(ev, e => {
-        e.preventDefault();
-        dropZone.classList.remove("dragging");
-      });
-    });
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
 
-    dropZone.addEventListener("drop", e => {
-      e.preventDefault();
-      const file = Array.from(e.dataTransfer.files).find(f =>
-        f.name.toLowerCase().endsWith(".epub")
-      );
-      if (file) handleEpubFile(file);
-      else setStatus("Please drop an .epub file");
-    });
-  }
-
-  // Rest of your event listeners (chapterSelect, playPause, etc.)
-  document.getElementById("chapterSelect")?.addEventListener("change", e => {
-    if (e.target.value) loadChapter(e.target.value);
-  });
-
-  document.getElementById("playPause")?.addEventListener("click", () => {
-    if (speechSynthesis.paused) {
-      speechSynthesis.resume();
-    } else if (speechSynthesis.speaking) {
-      speechSynthesis.pause();
-    }
-    // (or use the improved version from my previous answer)
-  });
-
-  document.getElementById("stop")?.addEventListener("click", stop);
-
-  // rate display
-  const rateInput = document.getElementById("rate");
-  const rateValue = document.getElementById("rateValue");
-  rateInput?.addEventListener("input", () => {
-    rateValue.textContent = (parseFloat(rateInput.value) || 1).toFixed(1) + "×";
-  });
-});
+  <!-- Your script – loads AFTER the HTML exists -->
+  <script src="script.js"></script>
+</body>
+</html>
