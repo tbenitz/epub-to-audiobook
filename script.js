@@ -2,111 +2,227 @@ let book = null;
 let currentAudio = null;
 let currentUtterance = null;
 
-function stop() {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-  speechSynthesis.cancel();
-  document.getElementById("playPause").textContent = "Play";
-  document.getElementById("status").textContent = "Stopped";
+// ---------- Helpers ----------
+
+function setStatus(msg) {
+  const el = document.getElementById("status");
+  if (el) el.textContent = msg;
 }
+
+function stop() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  speechSynthesis.cancel();
+  const pp = document.getElementById("playPause");
+  if (pp) pp.textContent = "Play";
+  setStatus("Stopped");
+}
+
+// ---------- Text-to-Speech ----------
 
 async function speakText(text, rate = 1) {
   stop();
-  document.getElementById("status").textContent = "Speaking...";
+
+  if (!text || !text.trim()) {
+    setStatus("No text to read.");
+    return;
+  }
+
+  setStatus("Speaking...");
 
   const sentences = text.match(/[^\.!?]+[\.!?]+/g) || [text];
   let i = 0;
+  const progressEl = document.getElementById("progress");
+  const playPauseBtn = document.getElementById("playPause");
 
   function speakNext() {
     if (i >= sentences.length) {
-      document.getElementById("status").textContent = "Finished";
+      setStatus("Finished");
+      if (playPauseBtn) playPauseBtn.textContent = "Play";
+      if (progressEl) progressEl.value = 100;
       return;
     }
+
     const utterance = new SpeechSynthesisUtterance(sentences[i].trim());
     utterance.rate = rate;
+
     utterance.onend = () => {
       i++;
-      document.getElementById("progress").value = (i / sentences.length) * 100;
+      if (progressEl) {
+        progressEl.value = (i / sentences.length) * 100;
+      }
       speakNext();
     };
-    utterance.onerror = (e) => console.error(e);
+
+    utterance.onerror = (e) => {
+      console.error("TTS error:", e);
+      setStatus("Speech error – see console.");
+    };
+
     speechSynthesis.speak(utterance);
     currentUtterance = utterance;
+    if (playPauseBtn) playPauseBtn.textContent = "Pause";
   }
+
   speakNext();
 }
 
-// ——— EPUB LOADING (this is the fixed part) ———
-document.getElementById("epubInput").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+// ---------- EPUB loading ----------
+
+async function handleEpubFile(file) {
   if (!file) return;
 
   if (!window.ePub) {
-    document.getElementById("status").textContent = "EPUB.js failed to load – try refreshing";
+    setStatus("EPUB.js failed to load – check script tags.");
     return;
   }
 
   try {
-    document.getElementById("status").textContent = "Opening EPUB...";
-    const arrayBuffer = await file.arrayBuffer();
+    setStatus("Opening EPUB...");
 
-    // This line is the correct one
+    const arrayBuffer = await file.arrayBuffer();
     book = ePub(arrayBuffer);
 
     await book.ready;
 
-    document.getElementById("title").textContent =
-      book.package.metadata.title || "Unknown Title";
+    // Title
+    const titleEl = document.getElementById("title");
+    const metaTitle = book.package?.metadata?.title || "Unknown Title";
+    if (titleEl) titleEl.textContent = metaTitle;
 
+    // Chapters
     const select = document.getElementById("chapterSelect");
-    select.innerHTML = "";
+    if (select) {
+      select.innerHTML = "";
+      book.spine.each((item) => {
+        const opt = document.createElement("option");
+        opt.value = item.href;
+        opt.textContent = (item.label && item.label.trim()) || item.href;
+        select.appendChild(opt);
+      });
+    }
 
-    book.spine.each((item) => {
-      const opt = document.createElement("option");
-      opt.value = item.href;
-      opt.textContent = item.label?.trim() || item.href;
-      select.appendChild(opt);
-    });
+    const controls = document.getElementById("bookControls");
+    if (controls) controls.classList.remove("hidden");
 
-    document.getElementById("bookControls").classList.remove("hidden");
-    document.getElementById("status").textContent = "Loaded! Choose a chapter.";
+    setStatus("Loaded! Choose a chapter.");
 
-    // Auto-play first chapter
-    select.value = select.options[0].value;
-    loadChapter(select.options[0].value);
-
+    // Auto-play first chapter if available
+    if (select && select.options.length > 0) {
+      select.value = select.options[0].value;
+      loadChapter(select.options[0].value);
+    }
   } catch (err) {
-    console.error(err);
-    document.getElementById("status").textContent = "Failed to load EPUB – check console";
+    console.error("Error loading EPUB:", err);
+    setStatus("Failed to load EPUB – check console.");
   }
-});
-
-async function loadChapter(href) {
-  if (!book) return;
-  document.getElementById("status").textContent = "Loading chapter...";
-  const section = book.section(href);
-  await section.load();
-  const text = section.document.body.innerText || "";
-  speakText(text, parseFloat(document.getElementById("rate").value));
 }
 
-// Controls
-document.getElementById("chapterSelect").addEventListener("change", (e) => {
-  loadChapter(e.target.value);
-});
+async function loadChapter(href) {
+  if (!book || !href) return;
 
-document.getElementById("playPause").addEventListener("click", () => {
-  if (speechSynthesis.paused) {
-    speechSynthesis.resume();
-    document.getElementById("playPause").textContent = "Pause";
-  } else if (speechSynthesis.speaking) {
-    speechSynthesis.pause();
-    document.getElementById("playPause").textContent = "Play";
+  setStatus("Loading chapter...");
+
+  try {
+    const section = book.section(href);
+    if (!section) {
+      setStatus("Could not find that chapter.");
+      return;
+    }
+
+    await section.load();
+
+    const doc = section.document;
+    const text = (doc && doc.body && doc.body.innerText) ? doc.body.innerText : "";
+
+    const rateInput = document.getElementById("rate");
+    const rate = rateInput ? parseFloat(rateInput.value) || 1 : 1;
+
+    speakText(text, rate);
+  } catch (err) {
+    console.error("Error loading chapter:", err);
+    setStatus("Failed to load chapter – see console.");
   }
-});
+}
 
-document.getElementById("stop").addEventListener("click", stop);
+// ---------- DOM wiring ----------
 
-document.getElementById("rate").addEventListener("input", (e) => {
-  const r = parseFloat(e.target.value).toFixed(1);
-  document.getElementById("rateValue").textContent = r + "×";
-});
+const fileInput = document.getElementById("epubInput");
+if (fileInput) {
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    handleEpubFile(file);
+  });
+}
+
+// Drag & drop (no createReader anywhere!)
+const dropZone = document.getElementById("dropZone");
+if (dropZone) {
+  dropZone.addEventListener("click", () => {
+    if (fileInput) fileInput.click();
+  });
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragging");
+  });
+
+  dropZone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragging");
+  });
+
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragging");
+
+    const file = [...e.dataTransfer.files].find(f =>
+      f.name.toLowerCase().endsWith(".epub")
+    );
+    if (file) {
+      handleEpubFile(file);
+    } else {
+      setStatus("Please drop an .epub file.");
+    }
+  });
+}
+
+// Chapter select
+const chapterSelect = document.getElementById("chapterSelect");
+if (chapterSelect) {
+  chapterSelect.addEventListener("change", (e) => {
+    loadChapter(e.target.value);
+  });
+}
+
+// Play / pause
+const playPauseBtn = document.getElementById("playPause");
+if (playPauseBtn) {
+  playPauseBtn.addEventListener("click", () => {
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      playPauseBtn.textContent = "Pause";
+    } else if (speechSynthesis.speaking) {
+      speechSynthesis.pause();
+      playPauseBtn.textContent = "Play";
+    }
+  });
+}
+
+// Stop
+const stopBtn = document.getElementById("stop");
+if (stopBtn) {
+  stopBtn.addEventListener("click", stop);
+}
+
+// Rate slider
+const rateInput = document.getElementById("rate");
+const rateValue = document.getElementById("rateValue");
+if (rateInput) {
+  rateInput.addEventListener("input", (e) => {
+    const r = parseFloat(e.target.value) || 1;
+    if (rateValue) rateValue.textContent = r.toFixed(1) + "×";
+  });
+}
