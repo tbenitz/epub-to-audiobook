@@ -1,17 +1,17 @@
-// Supertonic TTS Integration (adapted from https://github.com/supertone-inc/supertonic/tree/main/web)
-import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort.min.js';  // Latest for WebGPU
+// Supertonic TTS Integration (unchanged from previous — see below for full if needed)
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort.min.js';
 
 let session = null;
 let presets = null;
-const MODEL_URL = 'https://huggingface.co/Supertone/supertonic/resolve/main/supertonic.onnx';  // Core model
-const PRESETS_URL = 'https://huggingface.co/Supertone/supertonic/resolve/main/presets.json';  // Voices
+const MODEL_URL = 'https://huggingface.co/Supertone/supertonic/resolve/main/supertonic.onnx';
+const PRESETS_URL = 'https://huggingface.co/Supertone/supertonic/resolve/main/presets.json';
 const SAMPLE_RATE = 24000;
 
-// Simple BPE tokenizer mock (Supertonic uses SentencePiece; approximate for demo)
-const BPE_VOCAB = new Map();  // Load real vocab if needed; for now, char-level fallback
+// Simple BPE tokenizer mock
+const BPE_VOCAB = new Map();
 function tokenize(text) {
   const encoder = new TextEncoder();
-  return encoder.encode(text);  // Byte fallback; replace with real BPE for prod
+  return encoder.encode(text);
 }
 
 // Load presets
@@ -27,29 +27,26 @@ async function loadTTS() {
   if (session) return;
   document.getElementById("status").textContent = "Loading Supertonic model (~130MB, one-time)...";
   
-  // Enable WebGPU
   ort.env.logLevel = 'error';
-  ort.env.webgpu = { deviceId: 0 };  // Default GPU
+  ort.env.webgpu = { deviceId: 0 };
   
   try {
     session = await ort.InferenceSession.create(MODEL_URL, {
-      executionProviders: ['webgpu', 'wasm', 'cpu']  // Fallback chain
+      executionProviders: ['webgpu', 'wasm', 'cpu']
     });
     await loadPresets();
     document.getElementById("status").textContent = "Supertonic ready! (WebGPU enabled)";
   } catch (err) {
     console.error("Supertonic load error:", err);
     document.getElementById("status").textContent = "Fallback to browser TTS (WebGPU unavailable)";
-    // Use Web Speech as ultimate fallback
   }
 }
 
-// Generate speech from text (core function from web example)
+// Generate speech from text
 async function textToSpeech(text, voiceId = 'en-US-female') {
   if (!session) await loadTTS();
   
   if (!presets) {
-    // Fallback to Web Speech if presets fail
     return speakWithWebSpeech(text);
   }
 
@@ -59,9 +56,8 @@ async function textToSpeech(text, voiceId = 'en-US-female') {
   const inputIds = new ort.Tensor('int32', tokenize(normalizedText), [1, normalizedText.length]);
   const attentionMask = new ort.Tensor('int32', new Array(normalizedText.length).fill(1), [1, normalizedText.length]);
   
-  // Inference params (from example: 2 steps for speed)
   const steps = new ort.Tensor('int32', [2], [1]);
-  const voicePreset = presets[voiceId];  // e.g., { speaker_id: 0, style: 'neutral' }
+  const voicePreset = presets[voiceId];
   const speakerId = new ort.Tensor('float32', new Float32Array([voicePreset.speaker_id]), [1]);
 
   const feeds = {
@@ -72,28 +68,24 @@ async function textToSpeech(text, voiceId = 'en-US-female') {
   };
 
   const results = await session.run(feeds);
-  const audioLatents = results.audio_latents.data;  // Shape: [1, T, 512] or similar
+  const audioLatents = results.audio_latents.data;
 
-  // Decode latents to PCM (simplified from repo's decoder; assumes VQ-VAE)
-  const pcmData = decodeLatents(audioLatents, voicePreset);  // Custom func below
-
-  // Convert to WAV blob
+  const pcmData = decodeLatents(audioLatents, voicePreset);
   const wavBlob = pcmToWav(pcmData, SAMPLE_RATE);
   return URL.createObjectURL(wavBlob);
 }
 
-// Simplified latent decoder (mock; real one uses flow-matching reverse)
+// Simplified latent decoder (placeholder — replace with real VQ-VAE if available)
 function decodeLatents(latents, preset) {
-  // Placeholder: Quantize and upsample (in real: use VQ-VAE decoder)
   const T = latents.length / 512;
-  const pcm = new Int16Array(T * SAMPLE_RATE / 100);  // ~4s audio per step; adjust
+  const pcm = new Int16Array(T * SAMPLE_RATE / 100);
   for (let i = 0; i < pcm.length; i++) {
-    pcm[i] = (Math.sin(i / 1000) * 32767 * preset.volume) | 0;  // Sine tone placeholder—REPLACE WITH REAL DECODER
+    pcm[i] = (Math.sin(i / 1000) * 32767 * preset.volume) | 0;  // Temp sine; integrate real decoder
   }
   return pcm;
 }
 
-// PCM to WAV (from previous)
+// PCM to WAV
 function pcmToWav(pcmData, sampleRate) {
   const buffer = new ArrayBuffer(44 + pcmData.length * 2);
   const view = new DataView(buffer);
@@ -128,13 +120,12 @@ function speakWithWebSpeech(text, rate = 1) {
   return new Promise((resolve) => { utterance.onend = resolve; });
 }
 
-// Updated speakText to use generated audio
+// Updated speakText
 let currentAudio = null;
 async function speakText(text, rate = 1) {
   stop();
   document.getElementById("status").textContent = "Generating speech with Supertonic...";
 
-  // Split into sentences
   const sentences = text.match(/[^\.!?]+[\.!?]+/g) || [text];
   const audioUrls = [];
   for (let i = 0; i < sentences.length; i++) {
@@ -172,22 +163,26 @@ function stop() {
   document.getElementById("status").textContent = "Stopped";
 }
 
-// EPUB handling (from previous update, unchanged)
+// FIXED EPUB handling — uses window.ePub directly
 let book = null;
 document.getElementById("epubInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   try {
+    if (!window.ePub) {
+      throw new Error('ePub library not loaded. Refresh the page.');
+    }
+
     document.getElementById("status").textContent = "Loading EPUB...";
     const arrayBuffer = await file.arrayBuffer();
 
-    book = await createReader(arrayBuffer, { 
-      manager: 'default',
-      renderer: 'default' 
+    // FIXED: Use ePub constructor directly with ArrayBuffer
+    book = new window.ePub(arrayBuffer, {
+      replacements: 'blobUrl'  // Handles local assets
     });
 
-    await book.ready;
+    await book.ready;  // Wait for parsing
 
     const metadata = book.packaging.metadata;
     document.getElementById("title").textContent = metadata.title || 'Unknown Title';
@@ -234,7 +229,7 @@ async function loadChapter(href) {
   }
 }
 
-// Controls (updated for audio)
+// Controls (unchanged)
 document.getElementById("playPause").onclick = () => {
   if (currentAudio) {
     if (currentAudio.paused) {
