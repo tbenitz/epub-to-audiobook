@@ -1,0 +1,15 @@
+body { font-family: system-ui, sans-serif; background: #111; color: #eee; margin:0; padding:2rem; }
+.container { max-width: 800px; margin:auto; }
+h1 { text-align:center; }
+input[type=file] { 
+  display:block; margin:2rem auto; padding:1rem; 
+  background:#333; color:white; border-radius:8px;
+}
+button, select, input[type=range] { 
+  padding:0.8rem; margin:0.5rem; font-size:1rem; border-radius:8px;
+}
+.controls { display:flex; align-items:center; flex-wrap:wrap; gap:1rem; justify-content:center; margin:1rem 0;}
+progress { width:100%; height:20px; }
+.hidden { display:none; }
+#about { margin-top:4rem; color:#aaa; }
+a { color:#6cf; }
