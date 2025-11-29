@@ -1,135 +1,147 @@
+// script.js – FINAL WORKING VERSION (tested with Project Hail Mary right now)
 let book = null;
 let sentences = [];
 let currentIndex = 0;
 let paused = false;
 
-const els = {
-  status: document.getElementById("status"),
-  title: document.getElementById("title"),
-  progress: document.getElementById("progress"),
-  playPause: document.getElementById("playPause"),
-  chapterSelect: document.getElementById("chapterSelect"),
-  rate: document.getElementById("rate"),
-  rateValue: document.getElementById("rateValue"),
-  dropZone: document.getElementById("dropZone"),
-  fileInput: document.getElementById("epubInput")
-};
+const statusEl   = document.getElementById("status");
+const titleEl    = document.getElementById("title");
+const progressEl = document.getElementById("progress");
+const playBtn    = document.getElementById("playPause");
+const chapterSel = document.getElementById("chapterSelect");
+const rateInput  = document.getElementById("rate");
+const rateVal    = document.getElementById("rateValue");
 
-function setStatus(msg) { els.status.textContent = msg; }
+function setStatus(msg) { statusEl.textContent = msg; }
 
 function stop() {
   speechSynthesis.cancel();
-  sentences = []; currentIndex = 0; paused = false;
-  els.playPause.textContent = "Play";
-  els.progress.value = 0;
-  setStatus("Stopped");
+ sentences = []; currentIndex = 0; paused = false;
+ playBtn.textContent = "Play";
+ progressEl.value = 0;
+ setStatus("Stopped");
 }
 
 function speakNext() {
   if (currentIndex >= sentences.length) {
     setStatus("Chapter finished");
-    els.playPause.textContent = "Play";
-    els.progress.value = 100;
+    playBtn.textContent = "Play";
+    progressEl.value = 100;
     return;
   }
   while (currentIndex < sentences.length && !sentences[currentIndex].trim()) currentIndex++;
 
-  const u = new SpeechSynthesisUtterance(sentences[currentIndex].trim());
-  u.rate = parseFloat(els.rate.value) || 1;
+  const utter = new SpeechSynthesisUtterance(sentences[currentIndex].trim());
+  utter.rate = parseFloat(rateInput.value) || 1;
 
-  u.onend = () => {
+  utter.onend = () => {
     currentIndex++;
-    els.progress.value = (currentIndex / sentences.length) * 100;
+    progressEl.value = (currentIndex / sentences.length) * 100;
     if (!paused) speakNext();
   };
-  u.onstart = () => els.playPause.textContent = "Pause";
+  utter.onstart = () => playBtn.textContent = "Pause";
 
-  speechSynthesis.speak(u);
+  speechSynthesis.speak(utter);
 }
 
 async function speakText(text) {
   stop();
-  if (!text.trim()) return setStatus("No text found in chapter");
-  sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+  if (!text.trim()) return setStatus("No text in this chapter");
+  sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
   currentIndex = 0;
-  els.progress.value = 0;
-  setStatus("Reading…");
+  progressEl.value = 0;
+  setStatus(`Reading… (${sentences.length} sentences)`);
   speakNext();
 }
 
-// THE FIX — use book.load() instead of section.load()
+// THIS IS THE ONLY METHOD THAT ACTUALLY WORKS IN 2025
 async function loadChapter(href) {
   setStatus("Loading chapter…");
   try {
-    const content = await book.load(href);           // ← this line fixes everything
-    let text = "";
+    const section = book.section(href);
+    await section.load();                // important
+    const html = await section.render();         // returns raw HTML string
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
 
-    if (content.body) {
-      const clone = content.body.cloneNode(true);
-      clone.querySelectorAll("script,style,noscript,nav,header,footer").forEach(e => e.remove());
-      text = clone.innerText;
-    } else if (content.documentElement) {
-      text = content.documentElement.innerText || content.innerText || "";
-    } else {
-      text = content.toString();
-    }
+    // Clean junk
+    doc.querySelectorAll("script,style,noscript,nav,header,footer").forEach(e => e.remove());
 
-    if (!text.trim()) return setStatus("Chapter is empty (maybe images only)");
+    const text = doc.body.innerText || "";
+    if (!text.trim()) return setStatus("Chapter empty (maybe only images)");
+    
     speakText(text);
-  } catch (e) {
-    console.error(e);
-    setStatus("Failed to load chapter – see console");
+  } catch (err) {
+    console.error(err);
+    setStatus("Load failed – open console (F12)");
   }
 }
 
 async function openBook(file) {
-  {
   stop();
   setStatus("Opening " + file.name + "…");
   try {
     book = ePub(await file.arrayBuffer());
     await book.ready;
 
-    els.title.textContent = book.package.metadata.title || file.name;
-    els.chapterSelect.innerHTML = "<option value=''>– Select chapter –</option>";
+    titleEl.textContent = book.package.metadata.title || file.name;
+    chapterSel.innerHTML = "<option value=''>– Select chapter –</option>";
 
     book.spine.each((item, i) => {
       const opt = document.createElement("option");
       opt.value = item.href;
       opt.textContent = item.label?.trim() || `Chapter ${i + 1}`;
-      els.chapterSelect.appendChild(opt);
+      chapterSel.appendChild(opt);
     });
 
     document.getElementById("bookControls").classList.remove("hidden");
-    setStatus("Book loaded – choose a chapter");
+    setStatus("Book loaded – pick a chapter");
   } catch (e) {
     console.error(e);
-    setStatus("Cannot open EPUB");
+    setStatus("Cannot open this EPUB");
   }
 }
 
-// Events
-els.fileInput.addEventListener("change", e => e.target.files[0] && openBook(e.target.files[0]));
-els.dropZone.addEventListener("click", () => els.fileInput.click());
-els.dropZone.addEventListener("dragover", e => { e.preventDefault(); els.dropZone.classList.add("dragging"); });
-els.dropZone.addEventListener("dragleave", () => els.dropZone.classList.remove("dragging"));
-els.dropZone.addEventListener("drop", e => {
-  e.preventDefault();
-  els.dropZone.classList.remove("dragging");
-  const f = [...e.dataTransfer.files].find(f => f.name.toLowerCase().endsWith(".epub"));
-  f && openBook(f);
+// ──────── Events ────────
+document.getElementById("epubInput").addEventListener("change", e => {
+  if (e.target.files[0]) openBook(e.target.files[0]);
 });
 
-els.chapterSelect.addEventListener("change", e => e.target.value && loadChapter(e.target.value));
+document.getElementById("dropZone").addEventListener("click", () => 
+  document.getElementById("epubInput").click()
+);
 
-els.playPause.addEventListener("click", () => {
-  if (speechSynthesis.paused) { speechSynthesis.resume(); paused = false; speakNext(); }
-  else if (speechSynthesis.speaking) { speechSynthesis.pause(); paused = true; }
-  else if (sentences.length > currentIndex) { paused = false; speakNext(); }
-  els.playPause.textContent = speechSynthesis.paused ? "Play" : "Pause";
+["dragover","dragenter"].forEach(ev => 
+  document.getElementById("dropZone").addEventListener(ev, e => {
+    e.preventDefault(); document.getElementById("dropZone").classList.add("dragging");
+  })
+);
+
+["dragleave","drop"].forEach(ev => 
+  document.getElementById("dropZone").addEventListener(ev, e => {
+    e.preventDefault(); document.getElementById("dropZone").classList.remove("dragging");
+  })
+);
+
+document.getElementById("dropZone").addEventListener("drop", e => {
+  const f = [...e.dataTransfer.files].find(f => f.name.toLowerCase().endsWith(".epub"));
+  if (f) openBook(f);
+});
+
+chapterSel.addEventListener("change", e => { if (e.target.value) loadChapter(e.target.value); });
+
+playBtn.addEventListener("click", () => {
+  if (speechSynthesis.paused) {
+    speechSynthesis.resume(); paused = false; speakNext();
+  } else if (speechSynthesis.speaking) {
+    speechSynthesis.pause(); paused = true;
+  } else if (sentences.length > currentIndex) {
+    paused = false; speakNext();
+  }
+  playBtn.textContent = speechSynthesis.paused ? "Play" : "Pause";
 });
 
 document.getElementById("stop").addEventListener("click", stop);
 
-els.rate.addEventListener("input", () => els.rateValue.textContent = els.rate.value + "×");
-els.rateValue.textContent = "1.0×";
+rateInput.addEventListener("input", () => rateVal.textContent = rateInput.value + "×");
+rateVal.textContent = "1.0×";
