@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EPUB → Audiobook (Supertonic TTS)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>EPUB → Audiobook</h1>
+    <p>Upload an EPUB and listen to it with Supertonic — 100% in-browser, private, lightning-fast.</p>
+
+    <input type="file" id="epubInput" accept=".epub" />
+    <div id="status">Drop an EPUB to start</div>
+
+    <div id="bookControls" class="hidden">
+      <h2 id="title"></h2>
+      <select id="chapterSelect"></select>
+      <div class="controls">
+        <button id="playPause">▶️ Play</button>
+        <button id="stop">⏹ Stop</button>
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1"/>
+        <span id="rateValue">1.0×</span>
+      </div>
+      <progress id="progress" value="0" max="100"></progress>
+    </div>
+
+    <details id="about">
+      <summary>About this site</summary>
+      <p>Uses <a href="https://github.com/supertone-inc/supertonic" target="_blank">Supertonic</a> (66M param on-device TTS via WebGPU/WASM) + 
+         <a href="https://github.com/futurepress/epub.js" target="_blank">EPUB.js</a> for reading.</p>
+      <p>Everything runs in your browser. No data leaves your device.</p>
+    </details>
+  </div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
