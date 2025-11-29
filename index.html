@@ -1,59 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>EPUB → Audiobook</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: system-ui, sans-serif; background:#111827; color:#e5e7eb; margin:0; padding:20px; display:flex; justify-content:center; }
-    .app { background:#020617; padding:30px; border-radius:12px; max-width:700px; width:100%; box-shadow:0 20px 40px rgba(0,0,0,.6); }
-    h1 { margin-top:0; }
-    #dropZone { border:3px dashed #4b5563; padding:50px; text-align:center; border-radius:12px; cursor:pointer; margin-bottom:20px; }
-    #dropZone.dragging { border-color:#60a5fa; background:rgba(96,165,250,.2); }
-    #epubInput { display:none; }
-    #status { min-height:1.4em; color:#9ca3af; margin:10px 0; }
-    #bookControls.hidden { display:none; }
-    .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:15px 0; }
-    button, select, input[type=range] { padding:8px 14px; border-radius:6px; font-size:1rem; }
-    button { background:#2563eb; color:white; border:none; cursor:pointer; }
-    button:hover { background:#1d4ed8; }
-    button.secondary { background:#374151; }
-    progress { width:100%; height:10px; border-radius:10px; margin-top:10px; }
-  </style>
+<meta charset="utf-8">
+<title>EPUB → Audiobook</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{font-family:system-ui,sans-serif;background:#111827;color:#e5e7eb;margin:0;padding:20px;display:flex;justify-content:center;min-height:100vh;align-items:flex-start}
+  .app{background:#020617;padding:30px;border-radius:12px;max-width:700px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.6)}
+  #dropZone{border:3px dashed #4b5563;padding:50px;text-align:center;border-radius:12px;cursor:pointer;margin-bottom:20px;transition:.2s}
+  #dropZone.dragging{border-color:#60a5fa;background:rgba(96,165,250,.2)}
+  #epubInput{display:none}
+  #status{min-height:1.4em;color:#9ca3af;margin:15px 0}
+  #bookControls.hidden{display:none}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:15px 0}
+  button,select,input[type=range]{padding:8px 14px;border-radius:6px;font-size:1rem}
+  button{background:#2563eb;color:white;border:none;cursor:pointer}
+  button:hover{background:#1d4ed8}
+  button.secondary{background:#374151}
+  progress{width:100%;height:10px;border-radius:10px;margin-top:10px}
+</style>
 </head>
 <body>
-  <div class="app">
-    <h1>EPUB → Audiobook (TTS)</h1>
+<div class="app">
+  <h1>EPUB → Audiobook (TTS)</h1>
 
-    <div id="dropZone">
-      <strong>Drop your .epub here<br>or <strong>click to choose</strong>
-      <input type="file" id="epubInput" accept=".epub,application/epub+zip">
-    </div>
-
-    <div id="status">Ready – drop or select an EPUB file</div>
-    <div id="title"><em>No book loaded</em></div>
-
-    <div id="bookControls" class="hidden">
-      <div class="row">
-        <label>Chapter:</label>
-        <select id="chapterSelect"></select>
-      </div>
-      <div class="row">
-        <button id="playPause">Play</button>
-        <button id="stop" class="secondary">Stop</button>
-        <label>Speed:</label>
-        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
-        <span id="rateValue">1.0×</span>
-      </div>
-      <progress id="progress" value="0" max="100"></progress>
-    </div>
+  <div id="dropZone">
+    <strong>Drop .epub here<br>or click to choose</strong>
+    <input type="file" id="epubInput" accept=".epub">
   </div>
 
-  <!-- Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
-  
-  <!-- Your script – loads AFTER the HTML exists -->
-  <script src="script.js"></script>
+  <div id="status">Ready</div>
+  <div id="title"><em>No book loaded</em></div>
+
+  <div id="bookControls" class="hidden">
+    <div class="row"><label>Chapter:</label><select id="chapterSelect"></select></div>
+    <div class="row">
+      <button id="playPause">Play</button>
+      <button id="stop" class="secondary">Stop</button>
+      <label>Speed:</label>
+      <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+      <span id="rateValue">1.0×</span>
+    </div>
+    <progress id="progress" value="0" max="100"></progress>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
