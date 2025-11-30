@@ -1,52 +1,868 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>EPUB → Audiobook</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  body{font-family:system-ui,sans-serif;background:#111827;color:#e5e7eb;margin:0;padding:20px;display:flex;justify-content:center;min-height:100vh;align-items:flex-start}
-  .app{background:#020617;padding:30px;border-radius:12px;max-width:700px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.6)}
-  #dropZone{border:3px dashed #4b5563;padding:50px;text-align:center;border-radius:12px;cursor:pointer;margin-bottom:20px;transition:.2s}
-  #dropZone.dragging{border-color:#60a5fa;background:rgba(96,165,250,.2)}
-  #epubInput{display:none}
-  #status{min-height:1.4em;color:#9ca3af;margin:15px 0}
-  #bookControls.hidden{display:none}
-  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:15px 0}
-  button,select,input[type=range]{padding:8px 14px;border-radius:6px;font-size:1rem}
-  button{background:#2563eb;color:white;border:none;cursor:pointer}
-  button:hover{background:#1d4ed8}
-  button.secondary{background:#374151}
-  progress{width:100%;height:10px;border-radius:10px;margin-top:10px}
-</style>
+  <meta charset="UTF-8">
+  <title>Supertone Superaudiotronic — EPUB Reader + Supertonic TTS</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #000;
+      color: #0f9;
+      margin: 30px;
+      text-align: center;
+    }
+    h1 {
+      color: #0ff;
+      margin-bottom: 10px;
+    }
+    #drop {
+      border: 3px dashed #0f9;
+      padding: 40px;
+      margin: 10px auto 20px;
+      max-width: 900px;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 20px;
+      background: #000;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    #drop.hover {
+      background: #001111;
+      border-color: #0ff;
+    }
+    #controls {
+      margin: 10px auto 10px;
+      display: none;
+      max-width: 900px;
+      text-align: left;
+    }
+    button {
+      padding: 10px 18px;
+      margin: 4px 6px 4px 0;
+      font-size: 15px;
+      background: #002626;
+      color: #0ff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #003636;
+    }
+    label {
+      margin-right: 12px;
+      font-size: 14px;
+    }
+    select, input[type="range"] {
+      margin-left: 4px;
+    }
+    #sectionsContainer {
+      display: none;
+      margin: 10px auto 5px;
+      max-width: 900px;
+      text-align: left;
+      font-size: 14px;
+    }
+    #sectionSelect {
+      width: 100%;
+      max-width: 900px;
+      margin-top: 4px;
+    }
+    #text {
+      width: 90%;
+      max-width: 900px;
+      height: 320px;
+      margin: 10px auto 10px;
+      padding: 12px;
+      background: #001010;
+      color: #0ff;
+      border: 2px solid #044;
+      border-radius: 12px;
+      font-size: 15px;
+      text-align: left;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #status {
+      font-size: 15px;
+      margin: 8px;
+      color: #0ff;
+    }
+    #progress {
+      width: 80%;
+      height: 16px;
+      background: #002626;
+      border-radius: 8px;
+      margin: 6px auto 12px;
+      display: none;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #0ff;
+      border-radius: 8px;
+      width: 0%;
+    }
+    small {
+      color: #088;
+      font-size: 12px;
+    }
+    .word-span {
+      cursor: pointer;
+    }
+    .word-span.active-word {
+      background: #044;
+      color: #0ff;
+      border-radius: 4px;
+      padding: 0 2px;
+    }
+  </style>
 </head>
 <body>
-<div class="app">
-  <h1>EPUB → Audiobook (TTS)</h1>
+  <h1>Superaudiotronic — EPUB Reader + Supertonic TTS</h1>
+  <div id="drop">
+    DROP <strong>.txt</strong> or <strong>.epub</strong> here<br>
+    <small>…or click to pick a file</small>
+  </div>
+  <input type="file" id="fileInput" style="display:none;" accept=".txt,.epub">
 
-  <div id="dropZone">
-    <strong>Drop .epub here<br>or click to choose</strong>
-    <input type="file" id="epubInput" accept=".epub">
+  <div id="sectionsContainer">
+    <div><strong>Section / Chapter:</strong></div>
+    <select id="sectionSelect"></select>
   </div>
 
-  <div id="status">Ready</div>
-  <div id="title"><em>No book loaded</em></div>
-
-  <div id="bookControls" class="hidden">
-    <div class="row"><label>Chapter:</label><select id="chapterSelect"></select></div>
-    <div class="row">
-      <button id="playPause">Play</button>
-      <button id="stop" class="secondary">Stop</button>
-      <label>Speed:</label>
-      <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
-      <span id="rateValue">1.0×</span>
+  <div id="controls">
+    <div style="margin-bottom:6px;">
+      <button id="play">Play</button>
+      <button id="pause">Pause</button>
+      <button id="stop">Stop</button>
+      <button id="exportMp3">Export MP3 (48 kbps)</button>
     </div>
-    <progress id="progress" value="0" max="100"></progress>
+    <div style="margin-bottom:6px;">
+      <label>Voice:
+        <select id="voice">
+          <option value="F1">F1 (Female 1)</option>
+          <option value="F2">F2 (Female 2)</option>
+          <option value="M1">M1 (Male 1)</option>
+          <option value="M2">M2 (Male 2)</option>
+        </select>
+      </label>
+      <label>Speed:
+        <input type="range" id="speed" min="0.8" max="1.3" step="0.05" value="1.0">
+        <span id="speedVal">1.00×</span>
+      </label>
+    </div>
   </div>
-</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
-<script src="script.js"></script>
+  <div id="text" contenteditable="true">
+Type or paste text here, or drop an EPUB/TXT above. Select a section/chapter, choose a voice, then press Play.
+  </div>
+
+  <div id="status">Loading UI… Supertonic model will load on first Play.</div>
+  <div id="progress"><div id="progress-bar"></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
+
+  <script type="module">
+    import JSZip from "https://cdn.skypack.dev/jszip@3.10.1";
+    import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.0";
+
+    const drop = document.getElementById("drop");
+    const fileInput = document.getElementById("fileInput");
+    const textBox = document.getElementById("text");
+    const status = document.getElementById("status");
+    const progress = document.getElementById("progress");
+    const progressBar = document.getElementById("progress-bar");
+    const controls = document.getElementById("controls");
+    const playBtn = document.getElementById("play");
+    const pauseBtn = document.getElementById("pause");
+    const stopBtn = document.getElementById("stop");
+    const exportBtn = document.getElementById("exportMp3");
+    const speedSlider = document.getElementById("speed");
+    const speedVal = document.getElementById("speedVal");
+    const voiceSelect = document.getElementById("voice");
+    const sectionsContainer = document.getElementById("sectionsContainer");
+    const sectionSelect = document.getElementById("sectionSelect");
+
+    // --- Sections ---
+    let sections = [{ name: "Editable text", text: textBox.innerText.trim() }];
+
+    function setSections(newSections) {
+      sections = newSections.length ? newSections : [{ name: "Document", text: "" }];
+      sectionSelect.innerHTML = "";
+      sections.forEach((s, i) => {
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        opt.textContent = `${i + 1}. ${s.name}`.slice(0, 120);
+        sectionSelect.appendChild(opt);
+      });
+      sectionsContainer.style.display = sections.length > 1 ? "block" : "none";
+      textBox.textContent = sections[0]?.text || "";
+      handleContentChanged();  // reset playback+highlight when file/section changes
+    }
+
+    sectionSelect.onchange = () => {
+      const idx = parseInt(sectionSelect.value, 10);
+      if (!Number.isNaN(idx) && sections[idx]) {
+        textBox.textContent = sections[idx].text;
+        handleContentChanged();
+      }
+    };
+
+    // --- File loading ---
+    drop.onclick = () => fileInput.click();
+
+    ["dragover", "dragenter"].forEach(ev => {
+      drop.addEventListener(ev, e => {
+        e.preventDefault();
+        drop.classList.add("hover");
+      });
+    });
+    ["dragleave", "drop"].forEach(ev => {
+      drop.addEventListener(ev, e => {
+        e.preventDefault();
+        drop.classList.remove("hover");
+      });
+    });
+
+    drop.ondrop = e => {
+      e.preventDefault();
+      drop.classList.remove("hover");
+      const f = e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    };
+
+    fileInput.onchange = e => {
+      const f = e.target.files[0];
+      if (f) handleFile(f);
+    };
+
+    async function handleFile(file) {
+      status.textContent = `Reading ${file.name}…`;
+      progress.style.display = "none";
+      progressBar.style.width = "0%";
+
+      if (file.name.toLowerCase().endsWith(".txt")) {
+        const content = await file.text();
+        setSections([{ name: "Whole document", text: content }]);
+        status.textContent = "TXT loaded — choose section (if any) and press Play.";
+        controls.style.display = "block";
+        return;
+      }
+
+      if (file.name.toLowerCase().endsWith(".epub")) {
+        try {
+          const zip = await JSZip.loadAsync(file);
+          const chapterSections = [];
+
+          const fileNames = Object.keys(zip.files)
+            .filter(n => /\.(xhtml|html|htm|xml)$/i.test(n))
+            .sort();
+
+          for (const name of fileNames) {
+            const entry = zip.file(name);
+            if (!entry) continue;
+            const raw = await entry.async("string");
+
+            const noScript = raw
+              .replace(/<script[\s\S]*?<\/script>/gi, "")
+              .replace(/<style[\s\S]*?<\/style>/gi, "");
+            const plain = noScript
+              .replace(/<[^>]+>/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+
+            if (!plain) continue;
+
+            let label = "Section";
+            const titleMatch = raw.match(/<title[^>]*>([^<]+)<\/title>/i);
+            const h1Match = raw.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+            if (titleMatch && titleMatch[1].trim()) {
+              label = titleMatch[1].trim();
+            } else if (h1Match && h1Match[1].trim()) {
+              label = h1Match[1].trim();
+            } else {
+              const snippet = plain.slice(0, 80);
+              label = snippet || name.split("/").pop() || "Section";
+            }
+
+            const lower = label.toLowerCase();
+            if (lower.includes("contents")) label = "Table of Contents";
+            if (lower.includes("title page")) label = "Title Page";
+
+            chapterSections.push({ name: label, text: plain });
+          }
+
+          if (!chapterSections.length) {
+            const full = await file.text();
+            setSections([{ name: "Whole EPUB (fallback)", text: full }]);
+          } else {
+            setSections(chapterSections);
+          }
+
+          status.textContent = "EPUB loaded — pick a section/chapter, then press Play.";
+          controls.style.display = "block";
+        } catch (err) {
+          console.error(err);
+          status.textContent = "Failed to read EPUB (corrupted or unsupported).";
+        }
+        return;
+      }
+
+      status.textContent = "Unsupported file type. Please use .txt or .epub.";
+    }
+
+    // --- Supertonic TTS ---
+    env.allowLocalModels = false;
+
+    const VOICE_URLS = {
+      F1: "https://huggingface.co/onnx-community/Supertonic-TTS-ONNX/resolve/main/voices/F1.bin",
+      F2: "https://huggingface.co/onnx-community/Supertonic-TTS-ONNX/resolve/main/voices/F2.bin",
+      M1: "https://huggingface.co/onnx-community/Supertonic-TTS-ONNX/resolve/main/voices/M1.bin",
+      M2: "https://huggingface.co/onnx-community/Supertonic-TTS-ONNX/resolve/main/voices/M2.bin"
+    };
+
+    let ttsPipeline = null;
+    let currentVoiceId = "F1";
+
+    async function getTTSPipeline() {
+      if (!ttsPipeline) {
+        progress.style.display = "block";
+        progressBar.style.width = "10%";
+        status.textContent = "Downloading Supertonic TTS model (first time)…";
+
+        ttsPipeline = await pipeline(
+          "text-to-speech",
+          "onnx-community/Supertonic-TTS-ONNX"
+        );
+
+        progressBar.style.width = "100%";
+        setTimeout(() => {
+          progress.style.display = "none";
+          progressBar.style.width = "0%";
+        }, 600);
+        status.textContent = "Supertonic ready — select text or section and press Play.";
+      }
+      return ttsPipeline;
+    }
+
+    // Voice change should reset playback cache
+    function handleVoiceChanged() {
+      stopCurrentPlayback();
+      resetPlaybackState();
+      if (audio && audio.src) {
+        try { URL.revokeObjectURL(audio.src); } catch {}
+        audio.src = "";
+      }
+      status.textContent = "Voice changed — press Play to re-synthesize with new voice.";
+    }
+
+    voiceSelect.onchange = () => {
+      currentVoiceId = voiceSelect.value;
+      handleVoiceChanged();
+    };
+
+    // --- Word highlighting state ---
+    let fullWords = [];
+    let wordSpans = [];
+    let activeWordIndex = -1;
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, c => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c]));
+    }
+
+    function clearWordSpans() {
+      fullWords = [];
+      wordSpans = [];
+      activeWordIndex = -1;
+    }
+
+    function buildWordSpansFromText(rawText) {
+      const cleaned = rawText.replace(/\s+/g, " ").trim();
+      if (!cleaned) {
+        textBox.innerHTML = "";
+        clearWordSpans();
+        return;
+      }
+      const words = cleaned.split(" ");
+      fullWords = words;
+      const html = words
+        .map(
+          (w, i) =>
+            `<span class="word-span" data-word-index="${i}">${escapeHtml(w)}</span>`
+        )
+        .join(" ");
+      textBox.innerHTML = html;
+      wordSpans = Array.from(textBox.querySelectorAll(".word-span"));
+      activeWordIndex = -1;
+    }
+
+    function highlightWord(idx) {
+      if (!wordSpans.length) return;
+      if (idx < 0 || idx >= wordSpans.length) return;
+      if (activeWordIndex === idx) return;
+      if (activeWordIndex >= 0 && wordSpans[activeWordIndex]) {
+        wordSpans[activeWordIndex].classList.remove("active-word");
+      }
+      const span = wordSpans[idx];
+      span.classList.add("active-word");
+      activeWordIndex = idx;
+
+      const rect = span.getBoundingClientRect();
+      const containerRect = textBox.getBoundingClientRect();
+      if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
+        span.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
+
+    textBox.addEventListener("click", async e => {
+      const span = e.target.closest(".word-span");
+      if (!span) return;
+      const idx = parseInt(span.dataset.wordIndex, 10);
+      if (Number.isNaN(idx)) return;
+      await startPlaybackFromWord(idx);
+    });
+
+    // detect manual text edits (typing, paste, etc.)
+    textBox.addEventListener("input", () => {
+      handleContentChanged();
+    });
+
+    // --- Sentence splitting ---
+    function splitIntoSentences(text) {
+      const cleaned = text.replace(/\s+/g, " ").trim();
+      if (!cleaned) return [];
+      const matches = cleaned.match(/[^.!?]+[.!?]+|\S+/g) || [];
+      return matches.map(s => s.trim()).filter(Boolean);
+    }
+
+    // --- Streaming playback state ---
+    let audio = new Audio();
+    let isPlaying = false;
+
+    let playbackSentences = [];      // sentence strings
+    let sentenceWordStarts = [];     // sentence index -> global word start
+    let sentenceWordCounts = [];     // sentence index -> word count
+    let playbackCurrentIndex = 0;
+    let playbackAudioUrls = {};      // sentence index -> objectURL
+    let playbackSentenceDurations = {}; // index -> seconds
+    let playbackSynthInProgress = false;
+    let stopRequested = false;
+    const PREFETCH_AHEAD = 2;
+
+    const ttsAudioCtx =
+      new (window.AudioContext || window.webkitAudioContext)();
+
+    speedSlider.oninput = e => {
+      const v = parseFloat(e.target.value);
+      speedVal.textContent = v.toFixed(2) + "×";
+      if (audio) audio.playbackRate = v;
+    };
+
+    function resetPlaybackState() {
+      stopRequested = false;
+      playbackSentences = [];
+      sentenceWordStarts = [];
+      sentenceWordCounts = [];
+      playbackCurrentIndex = 0;
+      playbackSynthInProgress = false;
+      for (const key in playbackAudioUrls) {
+        try { URL.revokeObjectURL(playbackAudioUrls[key]); } catch {}
+      }
+      playbackAudioUrls = {};
+      playbackSentenceDurations = {};
+    }
+
+    // called whenever content changes (new file, new section, manual edit)
+    function handleContentChanged() {
+      stopCurrentPlayback();
+      resetPlaybackState();
+      clearWordSpans();
+      if (audio && audio.src) {
+        try { URL.revokeObjectURL(audio.src); } catch {}
+        audio.src = "";
+      }
+    }
+
+    function buildSentencesFromWords(startWordIndex = 0) {
+      const total = fullWords.length;
+      if (!total) return;
+      if (startWordIndex < 0) startWordIndex = 0;
+      if (startWordIndex >= total) startWordIndex = total - 1;
+
+      const tailWords = fullWords.slice(startWordIndex);
+      const tailText = tailWords.join(" ");
+      const sentences = splitIntoSentences(tailText);
+
+      playbackSentences = [];
+      sentenceWordStarts = [];
+      sentenceWordCounts = [];
+
+      let globalIdx = startWordIndex;
+
+      for (const sent of sentences) {
+        const words = sent.split(/\s+/).filter(Boolean);
+        const count = words.length;
+        if (!count) continue;
+        playbackSentences.push(sent);
+        sentenceWordStarts.push(globalIdx);
+        sentenceWordCounts.push(count);
+        globalIdx += count;
+      }
+    }
+
+    async function synthSentence(idx) {
+      try {
+        const tts = await getTTSPipeline();
+        const speed = parseFloat(speedSlider.value);
+        const text = playbackSentences[idx];
+        if (!text) return;
+
+        status.textContent = `Synthesizing sentence ${idx + 1} / ${playbackSentences.length}…`;
+
+        const output = await tts(text, {
+          speaker_embeddings: VOICE_URLS[currentVoiceId] || VOICE_URLS.F1,
+          num_inference_steps: 5,
+          speed
+        });
+
+        const blob = await output.toBlob();
+        const ab = await blob.arrayBuffer();
+        const audioBuf = await ttsAudioCtx.decodeAudioData(ab);
+        playbackSentenceDurations[idx] = audioBuf.duration;
+
+        const url = URL.createObjectURL(blob);
+        playbackAudioUrls[idx] = url;
+      } catch (err) {
+        console.error("Error synthesizing sentence", idx, err);
+      } finally {
+        playbackSynthInProgress = false;
+        prefetchNext();
+      }
+    }
+
+    function prefetchNext() {
+      if (playbackSynthInProgress) return;
+      for (
+        let i = playbackCurrentIndex + 1;
+        i < Math.min(playbackSentences.length, playbackCurrentIndex + 1 + PREFETCH_AHEAD);
+        i++
+      ) {
+        if (!playbackAudioUrls[i]) {
+          playbackSynthInProgress = true;
+          synthSentence(i);
+          break;
+        }
+      }
+    }
+
+    async function playCurrentSentence() {
+      if (playbackCurrentIndex >= playbackSentences.length) {
+        isPlaying = false;
+        playBtn.textContent = "Play";
+        status.textContent = "Finished section.";
+        return;
+      }
+
+      const idx = playbackCurrentIndex;
+      let url = playbackAudioUrls[idx];
+
+      if (!url) {
+        playbackSynthInProgress = true;
+        await synthSentence(idx);
+        url = playbackAudioUrls[idx];
+        if (!url) {
+          status.textContent = "Failed to synthesize this sentence.";
+          isPlaying = false;
+          playBtn.textContent = "Play";
+          return;
+        }
+      }
+
+      if (audio.src) {
+        try {
+          audio.pause();
+          URL.revokeObjectURL(audio.src);
+        } catch {}
+      }
+
+      audio = new Audio(url);
+      audio.playbackRate = parseFloat(speedSlider.value);
+
+      const startWord = sentenceWordStarts[idx];
+      const wordCount = sentenceWordCounts[idx];
+
+      audio.ontimeupdate = () => {
+        const d = playbackSentenceDurations[idx] || audio.duration || 0;
+        if (!d || !wordCount) return;
+        const rel = Math.min(audio.currentTime, d);
+        const frac = rel / d;
+        const wordOffset = Math.min(
+          wordCount - 1,
+          Math.floor(frac * wordCount)
+        );
+        highlightWord(startWord + wordOffset);
+      };
+
+      audio.onended = () => {
+        if (stopRequested) {
+          stopRequested = false;
+          isPlaying = false;
+          playBtn.textContent = "Play";
+          status.textContent = "Stopped.";
+          return;
+        }
+        highlightWord(startWord + wordCount - 1);
+        playbackCurrentIndex++;
+        playCurrentSentence();
+      };
+
+      await audio.play();
+      isPlaying = true;
+      playBtn.textContent = "Pause";
+      status.textContent = `Playing… sentence ${idx + 1} / ${playbackSentences.length}`;
+      prefetchNext();
+    }
+
+    async function startStreamingFromWord(startWordIndex = 0) {
+      const rawText = textBox.innerText || textBox.textContent || "";
+      if (!rawText.trim()) {
+        status.textContent = "No text to read in this section.";
+        return;
+      }
+
+      buildWordSpansFromText(rawText);
+      if (!fullWords.length) {
+        status.textContent = "No readable words found.";
+        return;
+      }
+
+      resetPlaybackState();
+      buildSentencesFromWords(startWordIndex);
+      if (!playbackSentences.length) {
+        status.textContent = "No readable sentences found.";
+        return;
+      }
+
+      if (startWordIndex < 0) startWordIndex = 0;
+      if (startWordIndex >= fullWords.length) {
+        startWordIndex = fullWords.length - 1;
+      }
+      highlightWord(startWordIndex);
+
+      playbackCurrentIndex = 0;
+      await playCurrentSentence();
+    }
+
+    async function startPlaybackFromWord(wordIdx) {
+      stopCurrentPlayback();
+      await startStreamingFromWord(wordIdx);
+    }
+
+    async function startPlaybackFromBeginning() {
+      stopCurrentPlayback();
+      await startStreamingFromWord(0);
+    }
+
+    function stopCurrentPlayback() {
+      stopRequested = true;
+      if (audio && audio.src) {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch {}
+      }
+      isPlaying = false;
+      playBtn.textContent = "Play";
+    }
+
+    // --- Export helpers: synth sentences -> AudioBuffer -> MP3 ---
+    function mixToMono(audioBuffer) {
+      const numChannels = audioBuffer.numberOfChannels;
+      const length = audioBuffer.length;
+      const out = new Float32Array(length);
+      for (let ch = 0; ch < numChannels; ch++) {
+        const data = audioBuffer.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+          out[i] += data[i] / numChannels;
+        }
+      }
+      return out;
+    }
+
+    async function synthSectionToAudioBuffer(text, onProgress) {
+      const trimmed = text.replace(/\s+/g, " ").trim();
+      if (!trimmed) throw new Error("No text to export.");
+
+      const tts = await getTTSPipeline();
+      const speed = parseFloat(speedSlider.value);
+      const sentences = splitIntoSentences(trimmed);
+      if (!sentences.length) throw new Error("No readable sentences found.");
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const buffers = [];
+
+      for (let i = 0; i < sentences.length; i++) {
+        status.textContent = `Export: synthesizing sentence ${i + 1} / ${sentences.length}…`;
+        const output = await tts(sentences[i], {
+          speaker_embeddings: VOICE_URLS[currentVoiceId] || VOICE_URLS.F1,
+          num_inference_steps: 5,
+          speed
+        });
+        const blob = await output.toBlob();
+        const abuf = await blob.arrayBuffer();
+        const audioBuf = await audioCtx.decodeAudioData(abuf);
+        buffers.push(audioBuf);
+        if (onProgress) onProgress((i + 1) / sentences.length);
+      }
+
+      const sampleRate = buffers[0].sampleRate;
+      const numChannels = buffers[0].numberOfChannels;
+      let totalLength = 0;
+      buffers.forEach(b => { totalLength += b.length; });
+
+      const outBuffer = audioCtx.createBuffer(numChannels, totalLength, sampleRate);
+      for (let ch = 0; ch < numChannels; ch++) {
+        const channelData = outBuffer.getChannelData(ch);
+        let offset = 0;
+        for (const b of buffers) {
+          channelData.set(b.getChannelData(ch), offset);
+          offset += b.length;
+        }
+      }
+
+      return outBuffer;
+    }
+
+    function audioBufferToMp3Blob(audioBuffer, kbps = 48) {
+      const lamejs = window.lamejs;
+      const sampleRate = audioBuffer.sampleRate;
+      const monoData = mixToMono(audioBuffer);
+      const mp3Encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
+
+      function floatTo16BitPCM(float32Array) {
+        const len = float32Array.length;
+        const result = new Int16Array(len);
+        for (let i = 0; i < len; i++) {
+          let s = Math.max(-1, Math.min(1, float32Array[i]));
+          result[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        return result;
+      }
+
+      const samples16 = floatTo16BitPCM(monoData);
+      const blockSize = 1152;
+      const mp3Data = [];
+
+      for (let i = 0; i < samples16.length; i += blockSize) {
+        const chunk = samples16.subarray(i, i + blockSize);
+        const mp3buf = mp3Encoder.encodeBuffer(chunk);
+        if (mp3buf.length > 0) mp3Data.push(mp3buf);
+      }
+      const end = mp3Encoder.flush();
+      if (end.length > 0) mp3Data.push(end);
+
+      return new Blob(mp3Data, { type: "audio/mpeg" });
+    }
+
+    // --- UI handlers ---
+    playBtn.onclick = async () => {
+      try {
+        // Resume only if still same voice/content and we haven't cleared cache
+        if (isPlaying && !audio.paused) {
+          audio.pause();
+          isPlaying = false;
+          playBtn.textContent = "Play";
+          status.textContent = "Paused.";
+          return;
+        }
+
+        if (audio.src && audio.paused && playbackSentences.length) {
+          audio.playbackRate = parseFloat(speedSlider.value);
+          await audio.play();
+          isPlaying = true;
+          playBtn.textContent = "Pause";
+          status.textContent = `Playing… sentence ${playbackCurrentIndex + 1} / ${playbackSentences.length}`;
+          return;
+        }
+
+        await startPlaybackFromBeginning();
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Error during synthesis/playback (see console).";
+        isPlaying = false;
+        playBtn.textContent = "Play";
+      }
+    };
+
+    pauseBtn.onclick = () => {
+      if (!audio.src) return;
+      audio.pause();
+      isPlaying = false;
+      playBtn.textContent = "Play";
+      status.textContent = "Paused.";
+    };
+
+    stopBtn.onclick = () => {
+      if (!audio.src) return;
+      stopCurrentPlayback();
+      status.textContent = "Stopped.";
+    };
+
+    exportBtn.onclick = async () => {
+      try {
+        if (isPlaying) {
+          status.textContent = "Stop playback before exporting.";
+          return;
+        }
+        const rawText = textBox.innerText || textBox.textContent || "";
+        const cleaned = rawText.replace(/\s+/g, " ").trim();
+        if (!cleaned) {
+          status.textContent = "No text to export.";
+          return;
+        }
+
+        status.textContent = "Export: synthesizing section…";
+        progress.style.display = "block";
+        progressBar.style.width = "0%";
+
+        const audioBuffer = await synthSectionToAudioBuffer(cleaned, fraction => {
+          progressBar.style.width = Math.round(fraction * 100) + "%";
+        });
+
+        status.textContent = "Encoding MP3 (48 kbps)…";
+        const mp3Blob = audioBufferToMp3Blob(audioBuffer, 48);
+
+        setTimeout(() => {
+          progress.style.display = "none";
+          progressBar.style.width = "0%";
+        }, 400);
+
+        const url = URL.createObjectURL(mp3Blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "superaudiotronic_48kbps.mp3";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        status.textContent = "MP3 downloaded (48 kbps).";
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Error exporting MP3 (see console).";
+        progress.style.display = "none";
+        progressBar.style.width = "0%";
+      }
+    };
+
+    controls.style.display = "block";
+    status.textContent = "Drop a TXT/EPUB or start typing, then press Play (model loads on first use).";
+  </script>
 </body>
 </html>
